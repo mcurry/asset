@@ -3,10 +3,10 @@
  * Asset Packer CakePHP Component
  * Copyright (c) 2008 Matt Curry
  * www.PseudoCoder.com
+ * http://sandbox2.pseudocoder.com/demo/asset
  * http://www.pseudocoder.com/archives/2007/08/08/automatic-asset-packer-cakephp-helper
  *
  * @author      mattc <matt@pseudocoder.com>
- * @version     1.3
  * @license     MIT
  *
  */
