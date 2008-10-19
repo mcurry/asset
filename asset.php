@@ -3,8 +3,8 @@
  * Asset Packer CakePHP Component
  * Copyright (c) 2008 Matt Curry
  * www.PseudoCoder.com
+ * http://github.com/mcurry/cakephp/tree/master/helpers/asset
  * http://sandbox2.pseudocoder.com/demo/asset
- * http://www.pseudocoder.com/archives/2007/08/08/automatic-asset-packer-cakephp-helper
  *
  * @author      mattc <matt@pseudocoder.com>
  * @license     MIT
@@ -86,20 +86,25 @@ class AssetHelper extends Helper {
         unset($view->__scripts[$i]);
       }
     }
-
-    $style_for_layout = '';
+    
+    $scripts_for_layout = '';
     //first the css
     if (!empty($css)) {
-      $style_for_layout .= $this->Html->css($this->cachePath . $this->process('css', $css));
-      $style_for_layout .= "\n\t";
+      $scripts_for_layout .= $this->Html->css($this->cachePath . $this->process('css', $css));
+      $scripts_for_layout .= "\n\t";
     }
 
     //then the js
     if (!empty($js)) {
-      $style_for_layout .= $this->Javascript->link($this->cachePath . $this->process('js', $js));
+      $scripts_for_layout .= $this->Javascript->link($this->cachePath . $this->process('js', $js));
+    }
+    
+    //anything leftover is outputted directly
+    if(!empty($view->__scripts)) {
+      $scripts_for_layout .= join("\n\t", $view->__scripts);
     }
 
-    return $style_for_layout;
+    return $scripts_for_layout;
   }
 
 
