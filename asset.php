@@ -113,14 +113,10 @@ class AssetHelper extends Helper {
         break;
     }
 
-    $folder = new Folder;
-
-    //make sure the cache folder exists
-    //$folder->mkdir($path . $this->cachePath);
+    $folder = new Folder($path . $this->cachePath, true);
 
     //check if the cached file exists
     $names = Set::extract($data, '{n}.name');
-    $folder->cd($path . $this->cachePath);
     $fileName = $folder->find($this->__generateFileName($names) . '_([0-9]{10}).' . $type);
     if ($fileName) {
       //take the first file...really should only be one.
