@@ -11,16 +11,18 @@
  *
  */
 
+App::import('Sanitize');
+
 class AssetHelper extends Helper {
   //Cake debug = 0                          packed js/css returned.  $this->debug doesn't do anything.
   //Cake debug > 0, $this->debug = false    essentially turns the helper off.  js/css not packed.  Good for debugging your js/css files.
-  //Cake debug > 0, $this->debug = true     packed js/css returned.  Good for debugging this helper.   
+  //Cake debug > 0, $this->debug = true     packed js/css returned.  Good for debugging this helper.
   var $debug = false;
-  
+
   //there is a *minimal* perfomance hit associated with looking up the filemtimes
   //if you clean out your cached dir (as set below) on builds then you don't need this.
   var $checkTS = false;
-  
+
   //the packed files are named by stringing together all the individual file names
   //this can generate really long names, so by setting this option to true
   //the long name is md5'd, producing a resonable length file name.
@@ -35,14 +37,14 @@ class AssetHelper extends Helper {
   //default is no compression
   //I like high_compression because it still leaves the file readable.
   var $cssCompression = 'high_compression';
-  
+
   var $helpers = array('Html', 'Javascript');
   var $viewScriptCount = 0;
-  
+
   //flag so we know the view is done rendering and it's the layouts turn
   function afterRender() {
     $view =& ClassRegistry::getObject('view');
-    if($view) {
+    if ($view) {
       $this->viewScriptCount = count($view->__scripts);
     }
   }
@@ -68,25 +70,25 @@ class AssetHelper extends Helper {
 
     //split the scripts into js and css
     foreach ($view->__scripts as $i => $script) {
-      if (preg_match('/js\/(.*).js/', $script, $match)) {
+      if (preg_match('/src="\/?(.*\/)?js\/(.*).js"/', $script, $match)) {
         $temp = array();
-        $temp['script'] = $match[1];
-        $temp['name'] = basename($match[1]);
+        $temp['script'] = $match[2];
+        $temp['plugin'] = trim($match[1], '/');
         $js[] = $temp;
 
         //remove the script since it will become part of the merged script
         unset($view->__scripts[$i]);
-      } else if (preg_match('/css\/(.*).css/', $script, $match)) {
+      } else if (preg_match('/href="\/?(.*\/)css\/(.*).css/', $script, $match)) {
         $temp = array();
-        $temp['script'] = $match[1];
-        $temp['name'] = basename($match[1]);
+        $temp['script'] = $match[2];
+        $temp['plugin'] = trim($match[1], '/');
         $css[] = $temp;
 
         //remove the script since it will become part of the merged script
         unset($view->__scripts[$i]);
       }
     }
-    
+
     $scripts_for_layout = '';
     //first the css
     if (!empty($css)) {
@@ -98,9 +100,9 @@ class AssetHelper extends Helper {
     if (!empty($js)) {
       $scripts_for_layout .= $this->Javascript->link($this->cachePath . $this->process('js', $js));
     }
-    
+
     //anything leftover is outputted directly
-    if(!empty($view->__scripts)) {
+    if (!empty($view->__scripts)) {
       $scripts_for_layout .= join("\n\t", $view->__scripts);
     }
 
@@ -108,7 +110,7 @@ class AssetHelper extends Helper {
   }
 
 
-  function process($type, $data) {
+  function process($type, $assets) {
     switch ($type) {
       case 'js':
         $path = JS;
@@ -121,8 +123,8 @@ class AssetHelper extends Helper {
     $folder = new Folder($path . $this->cachePath, true);
 
     //check if the cached file exists
-    $names = Set::extract($data, '{n}.name');
-    $fileName = $folder->find($this->__generateFileName($names) . '_([0-9]{10}).' . $type);
+    $scripts = Set::extract($assets, '{n}.script');
+    $fileName = $folder->find($this->__generateFileName($scripts) . '_([0-9]{10}).' . $type);
     if ($fileName) {
       //take the first file...really should only be one.
       $fileName = $fileName[0];
@@ -134,7 +136,6 @@ class AssetHelper extends Helper {
       $packed_ts = filemtime($path . $this->cachePath . $fileName);
 
       $latest_ts = 0;
-      $scripts = Set::extract($data, '{n}.script');
       foreach($scripts as $script) {
         $latest_ts = max($latest_ts, filemtime($path . $script . '.' . $type));
       }
@@ -152,9 +153,8 @@ class AssetHelper extends Helper {
 
       //merge the script
       $scriptBuffer = '';
-      $scripts = Set::extract($data, '{n}.script');
-      foreach($scripts as $script) {
-        $buffer = trim(file_get_contents($path . $script . '.' . $type));
+      foreach($assets as $asset) {
+        $buffer = $this->__getFileContents($asset, $type);
 
         switch ($type) {
           case 'js':
@@ -164,7 +164,7 @@ class AssetHelper extends Helper {
               $buffer = trim(JSMin::minify($buffer));
             }
             break;
-  
+
           case 'css':
             App::import('Vendor', 'csstidy', array('file' => 'class.csstidy.php'));
             $tidy = new csstidy();
@@ -173,13 +173,13 @@ class AssetHelper extends Helper {
             $buffer = $tidy->print->plain();
             break;
         }
-        
-        $scriptBuffer .= "\n/* $script.$type */\n" . $buffer;
+
+        $scriptBuffer .= sprintf("/* %s.%s */\n", $asset['script'], $type);
+        $scriptBuffer .= $buffer . "\n\n";
       }
 
-
       //write the file
-      $fileName = $this->__generateFileName($names) . '_' . $ts . '.' . $type;
+      $fileName = $this->__generateFileName($scripts) . '_' . $ts . '.' . $type;
       $file = new File($path . $this->cachePath . $fileName);
       $file->write(trim($scriptBuffer));
     }
@@ -192,14 +192,70 @@ class AssetHelper extends Helper {
 
     return $fileName;
   }
-  
-  function __generateFileName($names) {
-    $fileName = str_replace('.', '-', implode('_', $names));
-    
-    if($this->md5FileName) {
-      $fileName = md5($fileName);
+
+  /**
+   * Find the source file contents.  Looks in in webroot, vendors and plugins.
+   *
+   * @param string $filename
+   * @return string the full path to the file
+   * @access private
+  */
+  function __getFileContents($asset, $type) {
+    $paths = array();
+
+    switch ($type) {
+      case 'js':
+        $paths[] = JS;
+        break;
+      case 'css':
+        $paths[] = CSS;
+        break;
+    }
+
+    if (!empty($asset['plugin']) > 0) {
+      $pluginPaths = Configure::read('pluginPaths');
+      $count = count($pluginPaths);
+      for ($i = 0; $i < $count; $i++) {
+        $paths[] = $pluginPaths[$i] . $asset['plugin'] . DS . 'vendors' . DS;
+      }
+    }
+
+    $paths = array_merge($paths, Configure::read('vendorPaths'));
+    $assetFile = '';
+    foreach ($paths as $path) {
+      $script = sprintf('%s.%s', $asset['script'], $type);
+      if (is_file($path . $script) && file_exists($path . $script)) {
+        $assetFile = $path . $script;
+        break;
+      }
+
+      if (is_file($path . $type . DS . $script) && file_exists($path . $type . DS . $script)) {
+        $assetFile = $path . $type . DS . $script;
+        break;
+      }
+    }
+
+    if($assetFile) {
+      return trim(file_get_contents($assetFile));
     }
     
+    return '';
+  }
+
+  /**
+   * Generate the cached filename.
+   *
+   * @param array $names an array of the original file names
+   * @return string
+   * @access private
+  */
+  function __generateFileName($names) {
+    $fileName = Sanitize::paranoid(str_replace('/', '-', implode('_', $names)), array('_', '-'));
+
+    if ($this->md5FileName) {
+      $fileName = md5($fileName);
+    }
+
     return $fileName;
   }
 }
