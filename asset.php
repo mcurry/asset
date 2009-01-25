@@ -57,6 +57,11 @@ class AssetHelper extends Helper {
       return;
     }
 
+    //compatible with DebugKit
+    if(!empty($view->viewVars['debugToolbarPanels'])) {
+      $this->viewScriptCount += 1 + count($view->viewVars['debugToolbarJavascript']);
+    }
+    
     //move the layout scripts to the front
     $view->__scripts = array_merge(
                          array_slice($view->__scripts, $this->viewScriptCount),
