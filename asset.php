@@ -29,8 +29,8 @@ class AssetHelper extends Helper {
   var $md5FileName = false;
 
   //you can change this if you want to store the files in a different location.
-  //this is relative to your webroot/js and webroot/css paths
-  var $cachePath = 'packed/';
+  //this is relative to your webroot
+  var $cachePaths = array('css' => 'ccss', 'js' => 'cjs');
 
   //set the css compression level
   //options: default, low_compression, high_compression, highest_compression
@@ -56,7 +56,15 @@ class AssetHelper extends Helper {
     if (!$view->__scripts) {
       return;
     }
+    
+    if(Configure::read('Asset.jsPath')) {
+      $this->cachePaths['js'] = Configure::read('Asset.jsPath');
+    }
 
+    if(Configure::read('Asset.cssPath')) {
+      $this->cachePaths['css'] = Configure::read('Asset.cssPath');
+    }
+    
     //compatible with DebugKit
     if(!empty($view->viewVars['debugToolbarPanels'])) {
       $this->viewScriptCount += 1 + count($view->viewVars['debugToolbarJavascript']);
@@ -97,13 +105,13 @@ class AssetHelper extends Helper {
     $scripts_for_layout = '';
     //first the css
     if (!empty($css)) {
-      $scripts_for_layout .= $this->Html->css($this->cachePath . $this->process('css', $css));
+      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->process('css', $css));
       $scripts_for_layout .= "\n\t";
     }
 
     //then the js
     if (!empty($js)) {
-      $scripts_for_layout .= $this->Javascript->link($this->cachePath . $this->process('js', $js));
+      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->process('js', $js));
     }
 
     //anything leftover is outputted directly
@@ -125,7 +133,7 @@ class AssetHelper extends Helper {
         break;
     }
 
-    $folder = new Folder($path . $this->cachePath, true);
+    $folder = new Folder(WWW_ROOT . $this->cachePaths[$type], true);
 
     //check if the cached file exists
     $scripts = Set::extract($assets, '{n}.script');
@@ -138,7 +146,7 @@ class AssetHelper extends Helper {
     //make sure all the pieces that went into the packed script
     //are OLDER then the packed version
     if ($this->checkTS && $fileName) {
-      $packed_ts = filemtime($path . $this->cachePath . $fileName);
+      $packed_ts = filemtime($path . $this->cachePaths[$type] . DS . $fileName);
 
       $latest_ts = 0;
       foreach($scripts as $script) {
@@ -147,7 +155,7 @@ class AssetHelper extends Helper {
 
       //an original file is newer.  need to rebuild
       if ($latest_ts > $packed_ts) {
-        unlink($path . $this->cachePath . $fileName);
+        unlink(WWW_ROOT . $this->cachePaths[$type] . DS . $fileName);
         $fileName = null;
       }
     }
@@ -185,7 +193,7 @@ class AssetHelper extends Helper {
 
       //write the file
       $fileName = $this->__generateFileName($scripts) . '_' . $ts . '.' . $type;
-      $file = new File($path . $this->cachePath . $fileName);
+      $file = new File(WWW_ROOT . $this->cachePaths[$type] . DS . $fileName);
       $file->write(trim($scriptBuffer));
     }
 
