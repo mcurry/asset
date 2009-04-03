@@ -40,6 +40,9 @@ class AssetHelper extends Helper {
 
   var $helpers = array('Html', 'Javascript');
   var $viewScriptCount = 0;
+  var $initialized = false;
+  var $js = array();
+  var $css = array();
 
   //flag so we know the view is done rendering and it's the layouts turn
   function afterRender() {
@@ -49,12 +52,41 @@ class AssetHelper extends Helper {
     }
   }
 
-  function scripts_for_layout() {
+  function scripts_for_layout($types=array('js', 'css')) {
+    if(!$this->initialized) {
+      $scripts = $this->__init();
+    }
+    
+    if(!$scripts) {
+      return;
+    }
+    
+    $scripts_for_layout = '';
+    //first the css
+    if (in_array('css', $types) && !empty($this->css)) {
+      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->__process('css', $css));
+      $scripts_for_layout .= "\n\t";
+    }
+
+    //then the js
+    if (in_array('js', $types) && !empty($this->js)) {
+      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->__process('js', $js));
+    }
+
+    //anything leftover is outputted directly
+    if (!empty($view->__scripts)) {
+      $scripts_for_layout .= join("\n\t", $view->__scripts);
+    }
+
+    return $scripts_for_layout;
+  }
+
+  function __init() {
     $view =& ClassRegistry::getObject('view');
 
     //nothing to do
     if (!$view->__scripts) {
-      return;
+      return false;
     }
     
     if(Configure::read('Asset.jsPath')) {
@@ -76,18 +108,13 @@ class AssetHelper extends Helper {
                          array_slice($view->__scripts, 0, $this->viewScriptCount)
                        );
 
-
-    if (Configure::read('debug') && $this->debug == false) {
-      return join("\n\t", $view->__scripts);
-    }
-
     //split the scripts into js and css
     foreach ($view->__scripts as $i => $script) {
       if (preg_match('/src="\/?(.*\/)?js\/(.*).js"/', $script, $match)) {
         $temp = array();
         $temp['script'] = $match[2];
         $temp['plugin'] = trim($match[1], '/');
-        $js[] = $temp;
+        $this->js[] = $temp;
 
         //remove the script since it will become part of the merged script
         unset($view->__scripts[$i]);
@@ -95,35 +122,17 @@ class AssetHelper extends Helper {
         $temp = array();
         $temp['script'] = $match[2];
         $temp['plugin'] = trim($match[1], '/');
-        $css[] = $temp;
+        $this->css[] = $temp;
 
         //remove the script since it will become part of the merged script
         unset($view->__scripts[$i]);
       }
     }
-
-    $scripts_for_layout = '';
-    //first the css
-    if (!empty($css)) {
-      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->process('css', $css));
-      $scripts_for_layout .= "\n\t";
-    }
-
-    //then the js
-    if (!empty($js)) {
-      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->process('js', $js));
-    }
-
-    //anything leftover is outputted directly
-    if (!empty($view->__scripts)) {
-      $scripts_for_layout .= join("\n\t", $view->__scripts);
-    }
-
-    return $scripts_for_layout;
+    
+    return true;
   }
 
-
-  function process($type, $assets) {
+  function __process($type, $assets) {
     switch ($type) {
       case 'js':
         $path = JS;
