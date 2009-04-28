@@ -64,13 +64,13 @@ class AssetHelper extends Helper {
     $scripts_for_layout = '';
     //first the css
     if (in_array('css', $types) && !empty($this->css)) {
-      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->__process('css', $css));
+      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->__process('css', $this->css));
       $scripts_for_layout .= "\n\t";
     }
 
     //then the js
     if (in_array('js', $types) && !empty($this->js)) {
-      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->__process('js', $js));
+      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->__process('js', $this->js));
     }
 
     //anything leftover is outputted directly
