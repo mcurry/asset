@@ -2,8 +2,7 @@
  * Asset Packer CakePHP Plugin
  * Copyright (c) 2009 Matt Curry
  * www.PseudoCoder.com
- * http://sandbox2.pseudocoder.com/demo/asset
- * http://www.pseudocoder.com/archives/2007/08/08/automatic-asset-packer-cakephp-helper
+ * http://github.com/mcurry/asset
  *
  * @author      Matt Curry <matt@pseudocoder.com>
  * @license     MIT

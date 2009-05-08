@@ -1,12 +1,11 @@
 <?php
 /*
- * Asset Packer CakePHP Component
- * Copyright (c) 2008 Matt Curry
+ * Asset Packer CakePHP Plugin
+ * Copyright (c) 2009 Matt Curry
  * www.PseudoCoder.com
- * http://github.com/mcurry/cakephp/tree/master/helpers/asset
- * http://sandbox2.pseudocoder.com/demo/asset
+ * http://github.com/mcurry/asset
  *
- * @author      mattc <matt@pseudocoder.com>
+ * @author      Matt Curry <matt@pseudocoder.com>
  * @license     MIT
  *
  */
