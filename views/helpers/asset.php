@@ -11,7 +11,7 @@
  *
  */
 
-App::import('Sanitize');
+App::import('Core', array('File', 'Folder', 'Sanitize'));
 
 class AssetHelper extends Helper {
   //Cake debug = 0                          packed js/css returned.  $this->debug doesn't do anything.
@@ -21,7 +21,7 @@ class AssetHelper extends Helper {
 
   //there is a *minimal* perfomance hit associated with looking up the filemtimes
   //if you clean out your cached dir (as set below) on builds then you don't need this.
-  var $checkTS = false;
+  var $checkTs = false;
 
   //the packed files are named by stringing together all the individual file names
   //this can generate really long names, so by setting this option to true
@@ -31,6 +31,11 @@ class AssetHelper extends Helper {
   //you can change this if you want to store the files in a different location.
   //this is relative to your webroot
   var $cachePaths = array('css' => 'ccss', 'js' => 'cjs');
+  var $paths = array('www_root' => WWW_ROOT,
+                     'js' => JS,
+                     'css' => CSS);
+
+  var $foundFiles = array();
 
   //set the css compression level
   //options: default, low_compression, high_compression, highest_compression
@@ -44,6 +49,10 @@ class AssetHelper extends Helper {
   var $js = array();
   var $css = array();
 
+  function __construct($paths=array()) {
+    $this->paths = am($this->paths, $paths);
+  }
+
   //flag so we know the view is done rendering and it's the layouts turn
   function afterRender() {
     $view =& ClassRegistry::getObject('view');
@@ -53,14 +62,14 @@ class AssetHelper extends Helper {
   }
 
   function scripts_for_layout($types=array('js', 'css')) {
-    if(!$this->initialized) {
+    if (!$this->initialized) {
       $scripts = $this->__init();
     }
-    
-    if(!$scripts) {
+
+    if (!$scripts) {
       return;
     }
-    
+
     $scripts_for_layout = '';
     //first the css
     if (in_array('css', $types) && !empty($this->css)) {
@@ -88,20 +97,20 @@ class AssetHelper extends Helper {
     if (!$view->__scripts) {
       return false;
     }
-    
-    if(Configure::read('Asset.jsPath')) {
+
+    if (Configure::read('Asset.jsPath')) {
       $this->cachePaths['js'] = Configure::read('Asset.jsPath');
     }
 
-    if(Configure::read('Asset.cssPath')) {
+    if (Configure::read('Asset.cssPath')) {
       $this->cachePaths['css'] = Configure::read('Asset.cssPath');
     }
-    
+
     //compatible with DebugKit
-    if(!empty($view->viewVars['debugToolbarPanels'])) {
+    if (!empty($view->viewVars['debugToolbarPanels'])) {
       $this->viewScriptCount += 1 + count($view->viewVars['debugToolbarJavascript']);
     }
-    
+
     //move the layout scripts to the front
     $view->__scripts = array_merge(
                          array_slice($view->__scripts, $this->viewScriptCount),
@@ -128,24 +137,16 @@ class AssetHelper extends Helper {
         unset($view->__scripts[$i]);
       }
     }
-    
+
     return true;
   }
 
   function __process($type, $assets) {
-    switch ($type) {
-      case 'js':
-        $path = JS;
-        break;
-      case 'css':
-        $path = CSS;
-        break;
-    }
-
-    $folder = new Folder(WWW_ROOT . $this->cachePaths[$type], true);
+    $path = $this->__getPath($type);
+    $folder = new Folder($this->paths['www_root'] . $this->cachePaths[$type], true);
 
     //check if the cached file exists
-    $scripts = Set::extract($assets, '{n}.script');
+    $scripts = Set::extract('/script', $assets);
     $fileName = $folder->find($this->__generateFileName($scripts) . '_([0-9]{10}).' . $type);
     if ($fileName) {
       //take the first file...really should only be one.
@@ -154,17 +155,21 @@ class AssetHelper extends Helper {
 
     //make sure all the pieces that went into the packed script
     //are OLDER then the packed version
-    if ($this->checkTS && $fileName) {
-      $packed_ts = filemtime($path . $this->cachePaths[$type] . DS . $fileName);
+    if ($this->checkTs && $fileName) {
+      $packed_ts = filemtime($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
 
       $latest_ts = 0;
-      foreach($scripts as $script) {
-        $latest_ts = max($latest_ts, filemtime($path . $script . '.' . $type));
+      foreach($assets as $asset) {
+        $assetFile = $this->__findFile($asset, $type);
+        if (!$assetFile) {
+          continue;
+        }
+        $latest_ts = max($latest_ts, filemtime($assetFile));
       }
 
       //an original file is newer.  need to rebuild
       if ($latest_ts > $packed_ts) {
-        unlink(WWW_ROOT . $this->cachePaths[$type] . DS . $fileName);
+        unlink($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
         $fileName = null;
       }
     }
@@ -177,6 +182,7 @@ class AssetHelper extends Helper {
       $scriptBuffer = '';
       foreach($assets as $asset) {
         $buffer = $this->__getFileContents($asset, $type);
+        $origSize = strlen($buffer);
 
         switch ($type) {
           case 'js':
@@ -196,13 +202,13 @@ class AssetHelper extends Helper {
             break;
         }
 
-        $scriptBuffer .= sprintf("/* %s.%s */\n", $asset['script'], $type);
+        $scriptBuffer .= sprintf("/* %s.%s (%d%%) */\n", $asset['script'], $type, (strlen($buffer) / $origSize) * 100);
         $scriptBuffer .= $buffer . "\n\n";
       }
 
       //write the file
       $fileName = $this->__generateFileName($scripts) . '_' . $ts . '.' . $type;
-      $file = new File(WWW_ROOT . $this->cachePaths[$type] . DS . $fileName);
+      $file = new File($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
       $file->write(trim($scriptBuffer));
     }
 
@@ -223,16 +229,22 @@ class AssetHelper extends Helper {
    * @access private
   */
   function __getFileContents($asset, $type) {
-    $paths = array();
+    $assetFile = $this->__findFile($asset, $type);
 
-    switch ($type) {
-      case 'js':
-        $paths[] = JS;
-        break;
-      case 'css':
-        $paths[] = CSS;
-        break;
+    if ($assetFile) {
+      return trim(file_get_contents($assetFile));
     }
+
+    return '';
+  }
+
+  function __findFile($asset, $type) {
+    $key = md5(serialize($asset));
+    if (!empty($this->foundFiles[$key])) {
+      return $this->foundFiles[$key];
+    }
+
+    $paths = array($this->__getPath($type));
 
     if (!empty($asset['plugin']) > 0) {
       $pluginPaths = Configure::read('pluginPaths');
@@ -257,11 +269,8 @@ class AssetHelper extends Helper {
       }
     }
 
-    if($assetFile) {
-      return trim(file_get_contents($assetFile));
-    }
-    
-    return '';
+    $this->foundFiles[$key] = $assetFile;
+    return $assetFile;
   }
 
   /**
@@ -279,6 +288,17 @@ class AssetHelper extends Helper {
     }
 
     return $fileName;
+  }
+
+  function __getPath($type) {
+    switch ($type) {
+      case 'js':
+        return $this->paths['js'];
+      case 'css':
+        return $this->paths['css'];
+    }
+
+    return false;
   }
 }
 ?>

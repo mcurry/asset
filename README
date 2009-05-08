@@ -1,6 +1,6 @@
 /*
- * Asset Packer CakePHP Component
- * Copyright (c) 2008 Matt Curry
+ * Asset Packer CakePHP Plugin
+ * Copyright (c) 2009 Matt Curry
  * www.PseudoCoder.com
  * http://sandbox2.pseudocoder.com/demo/asset
  * http://www.pseudocoder.com/archives/2007/08/08/automatic-asset-packer-cakephp-helper
@@ -18,9 +18,9 @@
    1. You'll need a working version of CakePHP installed. This is running on 1.2.2.8120 stable.
    2. Download jsmin 1.1.0 or later and put it in vendors/jsmin.
    3. Download CSSTidy 1.3 or later and put the contents in vendors/csstidy.
-   4. Download the helper and unzip it to app/views/helpers.
+   4. Download the plugin to /app/plugins/asset.
    5. Include the helper in any controller that will need it. Most likely you will put it in AppController so that it's available to all your controllers:
-      var $helpers = array('Asset');
+      var $helpers = array('Asset.asset');
 
    6. In your layout and views include Javascript files as you normally would when using the $scripts_for_layout approach:
       $javascript->link('jquery', false);
