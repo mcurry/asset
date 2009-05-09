@@ -47,16 +47,18 @@ class AssetHelper extends Helper {
   var $initialized = false;
   var $js = array();
   var $css = array();
+  
+  var $View = null;
 
   function __construct($paths=array()) {
     $this->paths = am($this->paths, $paths);
+    $this->view =& ClassRegistry::getObject('view');
   }
 
   //flag so we know the view is done rendering and it's the layouts turn
   function afterRender() {
-    $view =& ClassRegistry::getObject('view');
-    if ($view) {
-      $this->viewScriptCount = count($view->__scripts);
+    if ($this->view) {
+      $this->viewScriptCount = count($this->view->__scripts);
     }
   }
 
@@ -82,18 +84,16 @@ class AssetHelper extends Helper {
     }
 
     //anything leftover is outputted directly
-    if (!empty($view->__scripts)) {
-      $scripts_for_layout .= join("\n\t", $view->__scripts);
+    if (!empty($this->view->__scripts)) {
+      $scripts_for_layout .= join("\n\t", $this->view->__scripts);
     }
 
     return $scripts_for_layout;
   }
 
   function __init() {
-    $view =& ClassRegistry::getObject('view');
-
     //nothing to do
-    if (!$view->__scripts) {
+    if (!$this->view->__scripts) {
       return false;
     }
 
@@ -106,18 +106,18 @@ class AssetHelper extends Helper {
     }
 
     //compatible with DebugKit
-    if (!empty($view->viewVars['debugToolbarPanels'])) {
-      $this->viewScriptCount += 1 + count($view->viewVars['debugToolbarJavascript']);
+    if (!empty($this->view->viewVars['debugToolbarPanels'])) {
+      $this->view->viewScriptCount += 1 + count($this->view->viewVars['debugToolbarJavascript']);
     }
 
     //move the layout scripts to the front
-    $view->__scripts = array_merge(
-                         array_slice($view->__scripts, $this->viewScriptCount),
-                         array_slice($view->__scripts, 0, $this->viewScriptCount)
+    $this->view->__scripts = array_merge(
+                         array_slice($this->view->__scripts, $this->viewScriptCount),
+                         array_slice($this->view->__scripts, 0, $this->viewScriptCount)
                        );
 
     //split the scripts into js and css
-    foreach ($view->__scripts as $i => $script) {
+    foreach ($this->view->__scripts as $i => $script) {
       if (preg_match('/src="\/?(.*\/)?js\/(.*).js"/', $script, $match)) {
         $temp = array();
         $temp['script'] = $match[2];
@@ -125,7 +125,7 @@ class AssetHelper extends Helper {
         $this->js[] = $temp;
 
         //remove the script since it will become part of the merged script
-        unset($view->__scripts[$i]);
+        unset($this->view->__scripts[$i]);
       } else if (preg_match('/href="\/?(.*\/)css\/(.*).css/', $script, $match)) {
         $temp = array();
         $temp['script'] = $match[2];
@@ -133,7 +133,7 @@ class AssetHelper extends Helper {
         $this->css[] = $temp;
 
         //remove the script since it will become part of the merged script
-        unset($view->__scripts[$i]);
+        unset($this->view->__scripts[$i]);
       }
     }
 
@@ -176,7 +176,18 @@ class AssetHelper extends Helper {
     //file doesn't exist.  create it.
     if (!$fileName) {
       $ts = time();
-
+      switch($type) {
+        case 'js':
+          if (PHP5) {
+            App::import('Vendor', 'jsmin/jsmin');
+          }
+        case 'css':
+          App::import('Vendor', 'csstidy', array('file' => 'class.csstidy.php'));
+          $tidy = new csstidy();
+          $tidy->load_template($this->cssCompression);
+          break;
+      }
+      
       //merge the script
       $scriptBuffer = '';
       foreach($assets as $asset) {
@@ -187,21 +198,21 @@ class AssetHelper extends Helper {
           case 'js':
             //jsmin only works with PHP5
             if (PHP5) {
-              App::import('Vendor', 'jsmin/jsmin');
               $buffer = trim(JSMin::minify($buffer));
             }
             break;
 
           case 'css':
-            App::import('Vendor', 'csstidy', array('file' => 'class.csstidy.php'));
-            $tidy = new csstidy();
-            $tidy->load_template($this->cssCompression);
             $tidy->parse($buffer);
             $buffer = $tidy->print->plain();
             break;
         }
 
-        $scriptBuffer .= sprintf("/* %s.%s (%d%%) */\n", $asset['script'], $type, (strlen($buffer) / $origSize) * 100);
+        $delta = 0;
+        if ($origSize > 0) {
+          $delta = (strlen($buffer) / $origSize) * 100;
+        }
+        $scriptBuffer .= sprintf("/* %s.%s (%d%%) */\n", $asset['script'], $type, $delta);
         $scriptBuffer .= $buffer . "\n\n";
       }
 
