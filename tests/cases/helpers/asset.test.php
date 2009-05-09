@@ -74,6 +74,13 @@ class AssetTestCase extends CakeTestCase {
     $this->Asset->md5FileName = false;
   }
   
+  function testFindFileDupeName() {
+    $path1 = $this->Asset->__findFile(array('plugin' => '', 'script' => 'asset1'), 'js');
+    $path2 = $this->Asset->__findFile(array('plugin' => '', 'script' => 'asset1'), 'css');
+    
+    $this->AssertNotEqual($path1, $path2);
+  }
+  
   function testGetFileContents() {
     $contents = $this->Asset->__getFileContents(array('plugin' => '', 'script' => 'script1'), 'js');
     $expected = <<<END

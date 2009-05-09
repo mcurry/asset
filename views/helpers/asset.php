@@ -249,7 +249,7 @@ class AssetHelper extends Helper {
   }
 
   function __findFile($asset, $type) {
-    $key = md5(serialize($asset));
+    $key = md5(serialize($asset) . $type);
     if (!empty($this->foundFiles[$key])) {
       return $this->foundFiles[$key];
     }
