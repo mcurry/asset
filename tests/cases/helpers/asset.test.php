@@ -32,6 +32,8 @@ class AssetTestCase extends CakeTestCase {
   }
   
   function startTest() {
+    $this->Asset->viewScriptCount = 0;
+    $this->Asset->initialized = false;
     $this->Asset->js = array();
     $this->Asset->css = array();
   }
@@ -98,6 +100,18 @@ $(function(){
 });
 END;
     $this->assertEqual($expected, $contents);
+  }
+  
+  function testGetFileContentsExtraPath() {
+    Configure::write('Asset.searchPaths', array($this->www_root . 'js' . DS));
+    $contents = $this->Asset->__getFileContents(array('plugin' => '', 'script' => 'open_source_with_js_and_css/style'), 'css');
+    $expected = <<<END
+#sub {
+  float: left;
+}
+END;
+    $this->assertEqual($expected, $contents);
+    Configure::delete('Asset.searchPaths');
   }
   
   function testProcessJsNew() {
@@ -212,6 +226,98 @@ END;
     $scripts = $this->Asset->scripts_for_layout();
     $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/style1_style2_[0-9]{10}.css" \/>' . "\n\t" .
                 '<script type="text\/javascript" src="\/cjs\/script1_script2_script3_[0-9]{10}.js"><\/script>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+
+  function testScriptsForLayoutCssInJs() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/js/open_source_with_js_and_css/lib.css" />',
+                      '<script type="text/javascript" src="/js/open_source_with_js_and_css/lib.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout();
+    $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/open_source_with_js_and_css-lib_[0-9]{10}.css" \/>' . "\n\t" .
+                '<script type="text\/javascript" src="\/cjs\/open_source_with_js_and_css-lib_[0-9]{10}.js"><\/script>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+  
+  function testScriptsForLayoutJs() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/css/style1.css" />',
+                      '<link rel="stylesheet" type="text/css" href="/css/style2.css" />',
+                      '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>',
+                      '<script type="text/javascript" src="/js/script1.js"></script>',
+                      '<script type="text/javascript" src="/js/script2.js"></script>',
+                      '<script type="text/javascript" src="/js/sublevel/sub.js"></script>',
+                      '<script type="text/javascript" src="/asset/js/script3.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout(array('js'));
+    $expected = '/<script type="text\/javascript" src="\/cjs\/script1_script2_sublevel-sub_script3_[0-9]{10}.js"><\/script>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+
+  function testScriptsForLayoutJsString() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/css/style1.css" />',
+                      '<link rel="stylesheet" type="text/css" href="/css/style2.css" />',
+                      '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>',
+                      '<script type="text/javascript" src="/js/script1.js"></script>',
+                      '<script type="text/javascript" src="/js/script2.js"></script>',
+                      '<script type="text/javascript" src="/asset/js/script3.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout('js');
+    $expected = '/<script type="text\/javascript" src="\/cjs\/script1_script2_script3_[0-9]{10}.js"><\/script>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+  
+  function testScriptsForLayoutCss() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/css/style1.css" />',
+                      '<link rel="stylesheet" type="text/css" href="/css/style2.css" />',
+                      '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>',
+                      '<script type="text/javascript" src="/js/script1.js"></script>',
+                      '<script type="text/javascript" src="/js/script2.js"></script>',
+                      '<script type="text/javascript" src="/asset/js/script3.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout(array('css'));
+    $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/style1_style2_[0-9]{10}.css" \/>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+
+  function testScriptsForLayoutCssString() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/css/style1.css" />',
+                      '<link rel="stylesheet" type="text/css" href="/css/style2.css" />',
+                      '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>',
+                      '<script type="text/javascript" src="/js/script1.js"></script>',
+                      '<script type="text/javascript" src="/js/script2.js"></script>',
+                      '<script type="text/javascript" src="/asset/js/script3.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout('css');
+    $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/style1_style2_[0-9]{10}.css" \/>/';
+                
+    $this->assertPattern($expected, $scripts);
+  }
+
+  function testScriptsForLayoutSplit() {
+    $this->View->__scripts = array ('<link rel="stylesheet" type="text/css" href="/css/style1.css" />',
+                      '<link rel="stylesheet" type="text/css" href="/css/style2.css" />',
+                      '<script type="text/javascript" src="/js/script1.js"></script>',
+                      '<script type="text/javascript" src="/js/script2.js"></script>',
+                      '<script type="text/javascript" src="/asset/js/script3.js"></script>'
+    );
+    
+    $scripts = $this->Asset->scripts_for_layout('css');
+    $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/style1_style2_[0-9]{10}.css" \/>/';
+                
+    $this->assertPattern($expected, $scripts);
+    
+    $scripts = $this->Asset->scripts_for_layout('js');
+    $expected = '/<script type="text\/javascript" src="\/cjs\/script1_script2_script3_[0-9]{10}.js"><\/script>/';
                 
     $this->assertPattern($expected, $scripts);
   }

@@ -52,6 +52,7 @@ class AssetHelper extends Helper {
 
   function __construct($paths=array()) {
     $this->paths = am($this->paths, $paths);
+        
     $this->view =& ClassRegistry::getObject('view');
   }
 
@@ -63,12 +64,12 @@ class AssetHelper extends Helper {
   }
 
   function scripts_for_layout($types=array('js', 'css')) {
-    if (!$this->initialized) {
-      $scripts = $this->__init();
+    if(!is_array($types)) {
+      $types = array($types);  
     }
-
-    if (!$scripts) {
-      return;
+    
+    if (!$this->initialized) {
+      $this->__init();
     }
 
     $scripts_for_layout = '';
@@ -92,9 +93,11 @@ class AssetHelper extends Helper {
   }
 
   function __init() {
+    $this->initialized = true;
+    
     //nothing to do
     if (!$this->view->__scripts) {
-      return false;
+      return;
     }
 
     if (Configure::read('Asset.jsPath')) {
@@ -118,17 +121,17 @@ class AssetHelper extends Helper {
 
     //split the scripts into js and css
     foreach ($this->view->__scripts as $i => $script) {
-      if (preg_match('/src="\/?(.*\/)?js\/(.*).js"/', $script, $match)) {
+      if (preg_match('/src="\/?(.*\/)?(js|css)\/(.*).js"/', $script, $match)) {
         $temp = array();
-        $temp['script'] = $match[2];
+        $temp['script'] = $match[3];
         $temp['plugin'] = trim($match[1], '/');
         $this->js[] = $temp;
 
         //remove the script since it will become part of the merged script
         unset($this->view->__scripts[$i]);
-      } else if (preg_match('/href="\/?(.*\/)css\/(.*).css/', $script, $match)) {
+      } else if (preg_match('/href="\/?(.*\/)(js|css)\/(.*).css/', $script, $match)) {
         $temp = array();
-        $temp['script'] = $match[2];
+        $temp['script'] = $match[3];
         $temp['plugin'] = trim($match[1], '/');
         $this->css[] = $temp;
 
@@ -136,8 +139,6 @@ class AssetHelper extends Helper {
         unset($this->view->__scripts[$i]);
       }
     }
-
-    return true;
   }
 
   function __process($type, $assets) {
@@ -255,6 +256,9 @@ class AssetHelper extends Helper {
     }
 
     $paths = array($this->__getPath($type));
+    if (Configure::read('Asset.searchPaths')) {
+      $paths = array_merge($paths, Configure::read('Asset.searchPaths'));
+    }
 
     if (!empty($asset['plugin']) > 0) {
       $pluginPaths = Configure::read('pluginPaths');
