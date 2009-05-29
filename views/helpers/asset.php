@@ -16,7 +16,7 @@ class AssetHelper extends Helper {
   //Cake debug = 0                          packed js/css returned.  $this->debug doesn't do anything.
   //Cake debug > 0, $this->debug = false    essentially turns the helper off.  js/css not packed.  Good for debugging your js/css files.
   //Cake debug > 0, $this->debug = true     packed js/css returned.  Good for debugging this helper.
-  var $debug = true;
+  var $debug = false;
 
   //there is a *minimal* perfomance hit associated with looking up the filemtimes
   //if you clean out your cached dir (as set below) on builds then you don't need this.
