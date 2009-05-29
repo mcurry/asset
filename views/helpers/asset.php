@@ -105,6 +105,7 @@ class AssetHelper extends Helper {
 
     if (App::import('Model', 'Js.JsLang')) {
       $this->Lang = ClassRegistry::init('Js.JsLang');
+      $this->Lang->init();
     }
 
     //nothing to do
@@ -256,7 +257,11 @@ class AssetHelper extends Helper {
     $assetFile = $this->__findFile($asset, $type);
 
     if ($assetFile) {
-      return trim(file_get_contents($assetFile));
+      if($type == 'js' && $this->Lang) {
+        return $this->Lang->i18n($asset['script'] . '.js');
+      } else {
+        return trim(file_get_contents($assetFile));
+      }
     }
 
     return '';
@@ -294,16 +299,15 @@ class AssetHelper extends Helper {
         $assetFile = $path . $type . DS . $script;
         break;
       }
-      
-      if($this->Lang) {
-        pr($script);
-        if (is_file($path . $type . DS . $script) && file_exists($path . $type . DS . $script)) {
-          $assetFile = $path . $type . DS . $script;
-          break;
-        }
-      }
     }
 
+    if($type == 'js' && !$assetFile && $this->Lang) {
+      $script = $this->Lang->parseFile($this->Lang->normalize($asset['script'] . '.js'));
+      if (is_file($this->Lang->paths['source'] . $script) && file_exists($this->Lang->paths['source'] . $script)) {
+        $assetFile = $this->Lang->paths['source'] . $script;
+      }
+    }
+      
     $this->foundFiles[$key] = $assetFile;
     return $assetFile;
   }
