@@ -22,6 +22,10 @@ class AssetHelper extends Helper {
   //if you clean out your cached dir (as set below) on builds then you don't need this.
   var $checkTs = false;
 
+  //Class for localizing JS files if JS I18N plugin is installed
+  //http://github.com/mcurry/js/tree/master
+  var $Lang = false;
+
   //the packed files are named by stringing together all the individual file names
   //this can generate really long names, so by setting this option to true
   //the long name is md5'd, producing a resonable length file name.
@@ -47,12 +51,12 @@ class AssetHelper extends Helper {
   var $initialized = false;
   var $js = array();
   var $css = array();
-  
+
   var $View = null;
 
   function __construct($paths=array()) {
     $this->paths = am($this->paths, $paths);
-        
+
     $this->view =& ClassRegistry::getObject('view');
   }
 
@@ -64,8 +68,12 @@ class AssetHelper extends Helper {
   }
 
   function scripts_for_layout($types=array('js', 'css')) {
-    if(!is_array($types)) {
-      $types = array($types);  
+    if (!is_array($types)) {
+      $types = array($types);
+    }
+
+    if (Configure::read('debug') && $this->debug == false) {
+      return join("\n\t", $this->view->__scripts);
     }
     
     if (!$this->initialized) {
@@ -94,18 +102,14 @@ class AssetHelper extends Helper {
 
   function __init() {
     $this->initialized = true;
-    
+
+    if (App::import('Model', 'Js.JsLang')) {
+      $this->Lang = ClassRegistry::init('Js.JsLang');
+    }
+
     //nothing to do
     if (!$this->view->__scripts) {
       return;
-    }
-
-    if (Configure::read('Asset.jsPath')) {
-      $this->cachePaths['js'] = Configure::read('Asset.jsPath');
-    }
-
-    if (Configure::read('Asset.cssPath')) {
-      $this->cachePaths['css'] = Configure::read('Asset.cssPath');
     }
 
     //compatible with DebugKit
@@ -115,9 +119,17 @@ class AssetHelper extends Helper {
 
     //move the layout scripts to the front
     $this->view->__scripts = array_merge(
-                         array_slice($this->view->__scripts, $this->viewScriptCount),
-                         array_slice($this->view->__scripts, 0, $this->viewScriptCount)
-                       );
+                               array_slice($this->view->__scripts, $this->viewScriptCount),
+                               array_slice($this->view->__scripts, 0, $this->viewScriptCount)
+                             );
+
+    if (Configure::read('Asset.jsPath')) {
+      $this->cachePaths['js'] = Configure::read('Asset.jsPath');
+    }
+
+    if (Configure::read('Asset.cssPath')) {
+      $this->cachePaths['css'] = Configure::read('Asset.cssPath');
+    }
 
     //split the scripts into js and css
     foreach ($this->view->__scripts as $i => $script) {
@@ -177,7 +189,7 @@ class AssetHelper extends Helper {
     //file doesn't exist.  create it.
     if (!$fileName) {
       $ts = time();
-      switch($type) {
+      switch ($type) {
         case 'js':
           if (PHP5) {
             App::import('Vendor', 'jsmin/jsmin');
@@ -188,7 +200,7 @@ class AssetHelper extends Helper {
           $tidy->load_template($this->cssCompression);
           break;
       }
-      
+
       //merge the script
       $scriptBuffer = '';
       foreach($assets as $asset) {
