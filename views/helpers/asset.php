@@ -34,7 +34,7 @@ class AssetHelper extends Helper {
   //you can change this if you want to store the files in a different location.
   //this is relative to your webroot
   var $cachePaths = array('css' => 'ccss', 'js' => 'cjs');
-  var $paths = array('www_root' => WWW_ROOT,
+  var $paths = array('wwwRoot' => WWW_ROOT,
                      'js' => JS,
                      'css' => CSS);
 
@@ -51,6 +51,7 @@ class AssetHelper extends Helper {
   var $initialized = false;
   var $js = array();
   var $css = array();
+	var $assets = array();
 
   var $View = null;
 
@@ -67,7 +68,7 @@ class AssetHelper extends Helper {
     }
   }
 
-  function scripts_for_layout($types=array('js', 'css')) {
+  function scripts_for_layout($types=array('js', 'css', 'codeblock')) {
     if (!is_array($types)) {
       $types = array($types);
     }
@@ -80,27 +81,31 @@ class AssetHelper extends Helper {
       $this->__init();
     }
 
-    $scripts_for_layout = '';
-    //first the css
-    if (in_array('css', $types) && !empty($this->css)) {
-      $scripts_for_layout .= $this->Html->css('/' . $this->cachePaths['css'] . '/' . $this->__process('css', $this->css));
-      $scripts_for_layout .= "\n\t";
-    }
+    $scripts_for_layout = array();
+		foreach($this->assets as $asset) {
+			if(!in_array($asset['type'], $types) ) {
+				continue;
+			}
+			
+			switch($asset['type']) {
+				case 'js':
+					$processed = $this->__process($asset['type'], $asset['assets']);
+					$scripts_for_layout[] = $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $processed);
+					break;
+				case 'css':
+					$processed = $this->__process($asset['type'], $asset['assets']);
+					$scripts_for_layout[] = $this->Html->css('/' . $this->cachePaths['css'] . '/' . $processed);
+					break;				
+				default:
+					$scripts_for_layout[] = $asset['assets']['script'];
+			}
+		}
 
-    //then the js
-    if (in_array('js', $types) && !empty($this->js)) {
-      $scripts_for_layout .= $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $this->__process('js', $this->js));
-    }
-
-    //anything leftover is outputted directly
-    if (!empty($this->view->__scripts)) {
-      $scripts_for_layout .= join("\n\t", $this->view->__scripts);
-    }
-
-    return $scripts_for_layout;
+    return implode("\n\t", $scripts_for_layout) . "\n\t";
   }
 
   function __init() {
+		$this->assets = array();
     $this->initialized = true;
 
     if (App::import('Model', 'Js.JsLang')) {
@@ -133,30 +138,44 @@ class AssetHelper extends Helper {
     }
 
     //split the scripts into js and css
+		$slot = 0;
+		$prev = '';
+		$holding = array();
     foreach ($this->view->__scripts as $i => $script) {
-      if (preg_match('/src="\/?(.*\/)?(js|css)\/(.*).js"/', $script, $match)) {
+      if (preg_match('/(src|href)="\/?(.*\/)?(js|css)\/(.*).(js|css)"/', $script, $match)) {
         $temp = array();
-        $temp['script'] = $match[3];
-        $temp['plugin'] = trim($match[1], '/');
-        $this->js[] = $temp;
-
-        //remove the script since it will become part of the merged script
-        unset($this->view->__scripts[$i]);
-      } else if (preg_match('/href="\/?(.*\/)(js|css)\/(.*).css/', $script, $match)) {
-        $temp = array();
-        $temp['script'] = $match[3];
-        $temp['plugin'] = trim($match[1], '/');
-        $this->css[] = $temp;
-
-        //remove the script since it will become part of the merged script
-        unset($this->view->__scripts[$i]);
-      }
+        $temp['script'] = $match[4];
+        $temp['plugin'] = trim($match[2], '/');
+				
+				if($prev != $match[5] && !empty($holding)) {
+					$this->assets[$slot] = array('type' => $prev, 'assets' => $holding);
+					$holding = array();
+					$slot ++;
+				}
+       
+				$holding[] = $temp;
+				$prev = $match[5];
+      } else {
+				if(!empty($holding)) {
+					$this->assets[$slot] = array('type' => $prev, 'assets' => $holding);
+					$holding = array();
+					$slot ++;
+				}
+				
+				$this->assets[$slot] = array('type' => 'codeblock' , 'assets' => array('script' => $script));
+				$slot ++;
+				$prev = 'codeblock';
+			}
     }
+		
+		if(!empty($holding)) {
+			$this->assets[$slot] = array('type' => $prev, 'assets' => $holding);
+		}
   }
 
   function __process($type, $assets) {
     $path = $this->__getPath($type);
-    $folder = new Folder($this->paths['www_root'] . $this->cachePaths[$type], true);
+    $folder = new Folder($this->paths['wwwRoot'] . $this->cachePaths[$type], true);
 
     //check if the cached file exists
     $scripts = Set::extract('/script', $assets);
@@ -169,7 +188,7 @@ class AssetHelper extends Helper {
     //make sure all the pieces that went into the packed script
     //are OLDER then the packed version
     if ($this->checkTs && $fileName) {
-      $packed_ts = filemtime($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
+      $packed_ts = filemtime($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
 
       $latest_ts = 0;
       foreach($assets as $asset) {
@@ -182,7 +201,7 @@ class AssetHelper extends Helper {
 
       //an original file is newer.  need to rebuild
       if ($latest_ts > $packed_ts) {
-        unlink($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
+        unlink($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
         $fileName = null;
       }
     }
@@ -233,7 +252,7 @@ class AssetHelper extends Helper {
 
       //write the file
       $fileName = $this->__generateFileName($scripts) . '_' . $ts . '.' . $type;
-      $file = new File($this->paths['www_root'] . $this->cachePaths[$type] . DS . $fileName);
+      $file = new File($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
       $file->write(trim($scriptBuffer));
     }
 
@@ -253,11 +272,11 @@ class AssetHelper extends Helper {
    * @return string the full path to the file
    * @access private
   */
-  function __getFileContents($asset, $type) {
+  function __getFileContents(&$asset, $type) {
     $assetFile = $this->__findFile($asset, $type);
 
     if ($assetFile) {
-      if($type == 'js' && $this->Lang) {
+      if($type == 'js' && $this->Lang && strpos($assetFile, $this->Lang->paths['source']) !== false) {
         return $this->Lang->i18n($asset['script'] . '.js');
       } else {
         return trim(file_get_contents($assetFile));
@@ -267,7 +286,7 @@ class AssetHelper extends Helper {
     return '';
   }
 
-  function __findFile($asset, $type) {
+  function __findFile(&$asset, $type) {
     $key = md5(serialize($asset) . $type);
     if (!empty($this->foundFiles[$key])) {
       return $this->foundFiles[$key];

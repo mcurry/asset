@@ -7,28 +7,41 @@ class AssetTestCase extends CakeTestCase {
   var $Folder = null;
   var $View = null;
   
-  var $www_root = null;
+  var $testAppRoot = null;
+  var $wwwRoot = null;
+  var $jsRoot = null;
   var $jsCache = null;
   var $cssCache = null;
   
   function startCase() {
-    $this->www_root = ROOT . DS . 'app' . DS . 'plugins' . DS . 'asset' . DS . 'tests' . DS . 'test_app' . DS . 'webroot' . DS;
-    $this->jsCache = $this->www_root . 'cjs' . DS;
-    $this->cssCache = $this->www_root . 'ccss' . DS;
+    $this->testAppRoot = ROOT . DS . 'app' . DS . 'plugins' . DS . 'asset' . DS . 'tests' . DS . 'test_app' . DS;
+    $this->wwwRoot =  $this->testAppRoot . 'webroot' . DS;
+    $this->jsCache = $this->wwwRoot . 'cjs' . DS;
+    $this->cssCache = $this->wwwRoot . 'ccss' . DS;
 
     $controller = null;
     $this->View = new View($controller);
     
-    $this->Asset = new AssetHelper(array('www_root' => $this->www_root, 'js' => $this->www_root . 'js' . DS, 'css' => $this->www_root . 'css' . DS));
+    $this->Asset = new AssetHelper(array('wwwRoot' => $this->wwwRoot, 'js' => $this->wwwRoot . 'js' . DS, 'css' => $this->wwwRoot . 'css' . DS));
     $this->Asset->Javascript = new JavascriptHelper();
     $this->Asset->Html = new HtmlHelper();
     
     $this->Folder = new Folder();
+
+    $this->jsRoot =  $this->wwwRoot . 'js' . DS;
+    Configure::write('localePaths', array($this->testAppRoot . 'locale'));
+    Configure::write('Js.paths', array('wwwRoot' => $this->wwwRoot,
+                                       'js' => $this->jsRoot,
+                                       'source' => $this->jsRoot . 'source' . DS));
+    
+    Configure::write('debug', 0);
   }
   
   function endCase() {
     $this->Folder->delete($this->jsCache);
     $this->Folder->delete($this->cssCache);
+    
+    Configure::write('debug', 2);
   }
   
   function startTest() {
@@ -77,14 +90,16 @@ class AssetTestCase extends CakeTestCase {
   }
   
   function testFindFileDupeName() {
-    $path1 = $this->Asset->__findFile(array('plugin' => '', 'script' => 'asset1'), 'js');
-    $path2 = $this->Asset->__findFile(array('plugin' => '', 'script' => 'asset1'), 'css');
+    $asset = array('plugin' => '', 'script' => 'asset1');
+    $path1 = $this->Asset->__findFile($asset, 'js');
+    $path2 = $this->Asset->__findFile($asset, 'css');
     
     $this->AssertNotEqual($path1, $path2);
   }
   
   function testGetFileContents() {
-    $contents = $this->Asset->__getFileContents(array('plugin' => '', 'script' => 'script1'), 'js');
+    $asset = array('plugin' => '', 'script' => 'script1');
+    $contents = $this->Asset->__getFileContents($asset, 'js');
     $expected = <<<END
 var str = "I'm a string";
 alert(str);
@@ -93,7 +108,8 @@ END;
   }
   
   function testGetFileContentsPlugin() {
-    $contents = $this->Asset->__getFileContents(array('plugin' => 'asset', 'script' => 'script3'), 'js');
+    $asset = array('plugin' => 'asset', 'script' => 'script3');
+    $contents = $this->Asset->__getFileContents($asset, 'js');
     $expected = <<<END
 $(function(){
   $("#nav").show();
@@ -103,8 +119,9 @@ END;
   }
   
   function testGetFileContentsExtraPath() {
-    Configure::write('Asset.searchPaths', array($this->www_root . 'js' . DS));
-    $contents = $this->Asset->__getFileContents(array('plugin' => '', 'script' => 'open_source_with_js_and_css/style'), 'css');
+    Configure::write('Asset.searchPaths', array($this->wwwRoot . 'js' . DS));
+    $asset = array('plugin' => '', 'script' => 'open_source_with_js_and_css/style');
+    $contents = $this->Asset->__getFileContents($asset, 'css');
     $expected = <<<END
 #sub {
   float: left;
@@ -161,7 +178,7 @@ END;
     $origFileName = $files[0];
 
     sleep(1);
-    $touched = touch($this->www_root . 'js' . DS . 'script1.js');
+    $touched = touch($this->wwwRoot . 'js' . DS . 'script1.js');
     $this->assertTrue($touched);
     
     $js = array(array('plugin' => '', 'script' => 'script1'),
@@ -206,12 +223,16 @@ END;
     
     
     $this->Asset->__init();
-    
-    $this->assertEqual($this->Asset->js, array(array('plugin' => '', 'script' => 'script1'),
-                                             array('plugin' => '', 'script' => 'script2'),
-                                             array('plugin' => 'asset', 'script' => 'script3')));
-    $this->assertEqual($this->Asset->css, array(array('plugin' => '', 'script' => 'style1'),
-                                              array('plugin' => '', 'script' => 'style2')));
+    $this->assertEqual($this->Asset->assets, array(
+																									 array('type' => 'css', 'assets' => array(array('script' => 'style1', 'plugin' => ''),
+																																														array('script' => 'style2', 'plugin' => ''))),
+																									 array('type' => 'codeblock', 'assets' => array('script' => '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>')),
+																									 array ('type' => 'js', 'assets' => array(array('script' => 'script1', 'plugin' => ''),
+																																														array('script' => 'script2', 'plugin' => ''),
+																																														array('script' => 'script3', 'plugin' => 'asset'))
+																													)
+																									 )
+											 );
   }
   
   function testScriptsForLayout() {
@@ -225,8 +246,8 @@ END;
     
     $scripts = $this->Asset->scripts_for_layout();
     $expected = '/<link rel="stylesheet" type="text\/css" href="\/ccss\/style1_style2_[0-9]{10}.css" \/>' . "\n\t" .
+								'<script type="text\/javascript" src="http:\/\/ajax.googleapis.com\/ajax\/libs\/jquery\/1.3.2\/jquery.min.js"><\/script>' . "\n\t" .
                 '<script type="text\/javascript" src="\/cjs\/script1_script2_script3_[0-9]{10}.js"><\/script>/';
-                
     $this->assertPattern($expected, $scripts);
   }
 
@@ -328,7 +349,9 @@ END;
                                     '<script type="text/javascript" src="/js/script2.js"></script>'
     );
     $scripts = $this->Asset->scripts_for_layout();
-    $expected = '/<script type="text\/javascript" src="\/cjs\/script1_script2_[0-9]{10}.js"><\/script><script type="text\/javascript">\/\/<!\[CDATA\[alert\("test"\);\/\/]]><\/script>/';
+    $expected = '/<script type="text\/javascript" src="\/cjs\/script1_[0-9]{10}.js"><\/script>' . "\n\t" .
+								'<script type="text\/javascript">\/\/<!\[CDATA\[alert\("test"\);\/\/]]><\/script>' . "\n\t" .
+								'<script type="text\/javascript" src="\/cjs\/script2_[0-9]{10}.js">/';
     $this->assertPattern($expected, $scripts);
   }
   
@@ -339,5 +362,25 @@ END;
     $scripts = $this->Asset->scripts_for_layout();
     $expected = '/<script type="text\/javascript" src="\/cjs\/layout_script1_[0-9]{10}.js"><\/script>/';
     $this->assertPattern($expected, $scripts);
+  }
+
+  function testLangFindFile() {
+		if ($this->skipIf(!App::import('Model', 'Js.JsLang'), '%s JS localize plugin not installed')) {
+			return;
+		}
+    
+    $asset = array('plugin' => '', 'script' => 'en/test');
+    $path = $this->Asset->__findFile($asset, 'js');
+    $this->assertEqual($this->jsRoot . 'source' . DS . 'test.js', $path);
+  }
+  
+  function testLangGetFileContents() {
+		if ($this->skipIf(!App::import('Model', 'Js.JsLang'), '%s JS localize plugin not installed')) {
+			return;
+		}
+    
+    $asset = array('plugin' => '', 'script' => 'en/test');
+    $content = $this->Asset->__getFileContents($asset, 'js');
+    $this->assertEqual('alert("Hello World");', $content);
   }
 }
