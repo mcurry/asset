@@ -383,4 +383,19 @@ END;
     $content = $this->Asset->__getFileContents($asset, 'js');
     $this->assertEqual('alert("Hello World");', $content);
   }
+	
+	function testDebugMode() {
+		Configure::write('debug', 2);
+
+    $this->View->__scripts = array ('<script type="text/javascript" src="/js/view.js"></script>',
+                                    '<script type="text/javascript" src="/js/layout.js"></script>'
+    );
+		
+		$this->Asset->viewScriptCount = 1;
+		$scripts = $this->Asset->scripts_for_layout();
+		$expected = '<script type="text/javascript" src="/js/layout.js"></script>' . "\n\t" . '<script type="text/javascript" src="/js/view.js"></script>';
+		$this->assertEqual($scripts, $expected);
+		
+		Configure::write('debug', 0);
+	}
 }

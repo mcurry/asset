@@ -73,12 +73,12 @@ class AssetHelper extends Helper {
       $types = array($types);
     }
 
-    if (Configure::read('debug') && $this->debug == false) {
-      return join("\n\t", $this->view->__scripts);
-    }
-    
     if (!$this->initialized) {
       $this->__init();
+    }
+		
+    if (Configure::read('debug') && $this->debug == false) {
+      return join("\n\t", $this->view->__scripts);
     }
 
     $scripts_for_layout = array();
@@ -105,22 +105,12 @@ class AssetHelper extends Helper {
   }
 
   function __init() {
-		$this->assets = array();
     $this->initialized = true;
-
-    if (App::import('Model', 'Js.JsLang')) {
-      $this->Lang = ClassRegistry::init('Js.JsLang');
-      $this->Lang->init();
-    }
+		$this->assets = array();
 
     //nothing to do
     if (!$this->view->__scripts) {
       return;
-    }
-
-    //compatible with DebugKit
-    if (!empty($this->view->viewVars['debugToolbarPanels'])) {
-      $this->view->viewScriptCount += 1 + count($this->view->viewVars['debugToolbarJavascript']);
     }
 
     //move the layout scripts to the front
@@ -128,6 +118,14 @@ class AssetHelper extends Helper {
                                array_slice($this->view->__scripts, $this->viewScriptCount),
                                array_slice($this->view->__scripts, 0, $this->viewScriptCount)
                              );
+		if (Configure::read('debug') && $this->debug == false) {
+			return;
+		}
+		
+    if (App::import('Model', 'Js.JsLang')) {
+      $this->Lang = ClassRegistry::init('Js.JsLang');
+      $this->Lang->init();
+    }
 
     if (Configure::read('Asset.jsPath')) {
       $this->cachePaths['js'] = Configure::read('Asset.jsPath');
