@@ -58,13 +58,13 @@ class AssetHelper extends Helper {
   function __construct($paths=array()) {
     $this->paths = am($this->paths, $paths);
 
-    $this->view =& ClassRegistry::getObject('view');
+    $this->View =& ClassRegistry::getObject('view');
   }
 
   //flag so we know the view is done rendering and it's the layouts turn
   function afterRender() {
-    if ($this->view) {
-      $this->viewScriptCount = count($this->view->__scripts);
+    if ($this->View) {
+      $this->viewScriptCount = count($this->View->__scripts);
     }
   }
 
@@ -78,7 +78,7 @@ class AssetHelper extends Helper {
     }
 		
     if (Configure::read('debug') && $this->debug == false) {
-      return join("\n\t", $this->view->__scripts);
+      return join("\n\t", $this->View->__scripts);
     }
 
     $scripts_for_layout = array();
@@ -109,14 +109,14 @@ class AssetHelper extends Helper {
 		$this->assets = array();
 
     //nothing to do
-    if (!$this->view->__scripts) {
+    if (!$this->View->__scripts) {
       return;
     }
 
     //move the layout scripts to the front
-    $this->view->__scripts = array_merge(
-                               array_slice($this->view->__scripts, $this->viewScriptCount),
-                               array_slice($this->view->__scripts, 0, $this->viewScriptCount)
+    $this->View->__scripts = array_merge(
+                               array_slice($this->View->__scripts, $this->viewScriptCount),
+                               array_slice($this->View->__scripts, 0, $this->viewScriptCount)
                              );
 		if (Configure::read('debug') && $this->debug == false) {
 			return;
@@ -139,7 +139,7 @@ class AssetHelper extends Helper {
 		$slot = 0;
 		$prev = '';
 		$holding = array();
-    foreach ($this->view->__scripts as $i => $script) {
+    foreach ($this->View->__scripts as $i => $script) {
       if (preg_match('/(src|href)="\/?(.*\/)?(js|css)\/(.*).(js|css)"/', $script, $match)) {
         $temp = array();
         $temp['script'] = $match[4];
