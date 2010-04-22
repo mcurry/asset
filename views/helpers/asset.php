@@ -303,7 +303,11 @@ class AssetHelper extends Helper {
       }
     }
 
-    $paths = array_merge($paths, Configure::read('vendorPaths'));
+		$vendorPaths = Configure::read('vendorPaths');
+		if($vendorPaths) {
+			$paths = array_merge($paths, $vendorPaths);
+		}
+		
     $assetFile = '';
     foreach ($paths as $path) {
       $script = sprintf('%s.%s', $asset['script'], $type);
