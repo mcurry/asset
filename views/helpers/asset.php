@@ -171,6 +171,58 @@ class AssetHelper extends Helper {
 		}
   }
 
+  function __preprocessCss($asset, $buffer) {
+	$originalPath = $asset['script'];
+
+	$rootPath = dirname(CSS_URL.$originalPath);
+
+	$matches = array();
+	$results = preg_match_all('#url\(\'?([^\'\)]+)\'?\)#i', $buffer, $matches, PREG_SET_ORDER);
+
+	$replacements = array();
+
+	foreach ($matches as $match) {
+		if (isset($replacements[$match[1]])) {
+			continue;
+		}
+
+		if (substr($match[1], 0, 1) == '/'
+			|| strpos($match[1], 'http://') !== false
+			|| strpos($match[1], 'https://') !== false) {
+			continue;
+		}
+
+		$normalized = $this->__normalizeImageUrl($rootPath.'/'.$match[1]);
+		$replacements[$match[1]] = Router::url($normalized);
+	}
+
+	return str_replace(array_keys($replacements), array_values($replacements), $buffer);
+  }
+
+  function __normalizeImageUrl($url) {
+	$parts = explode('/', $url);
+	$newparts = array();
+	$newpath = '';
+
+	while (($part = array_shift($parts)) !== NULL) {
+		if ($part === '.' || $part === '') {
+			continue;
+		}
+		if ($part === '..') {
+			if (!empty($newparts)) {
+				array_pop($newparts);
+				continue;
+			} else {
+				return false;
+			}
+		}
+		$newparts[] = $part;
+	}
+
+	$newpath .= implode('/', $newparts);
+	return '/'.$newpath;
+  }
+
   function __process($type, $assets) {
     $path = $this->__getPath($type);
     $folder = new Folder($this->paths['wwwRoot'] . $this->cachePaths[$type], true);
@@ -235,7 +287,7 @@ class AssetHelper extends Helper {
             break;
 
           case 'css':
-            $tidy->parse($buffer);
+            $tidy->parse($this->__preprocessCss($asset, $buffer));
             $buffer = $tidy->print->plain();
             break;
         }

@@ -398,4 +398,42 @@ END;
 		
 		Configure::write('debug', 0);
 	}
+
+	function testCssImagePathNormalization() {
+		$result = $this->Asset->__normalizeImageUrl('css/blueprint/background.jpg');
+		$this->assertEqual($result, '/css/blueprint/background.jpg');
+
+		$result = $this->Asset->__normalizeImageUrl('css/../images/background.png');
+		$this->assertEqual($result, '/images/background.png');
+
+		$result = $this->Asset->__normalizeImageUrl('css/drink/../../images/background.png');
+		$this->assertEqual($result, '/images/background.png');
+
+		$result = $this->Asset->__normalizeImageUrl('css/./images/background.png');
+		$this->assertEqual($result, '/css/images/background.png');
+	}
+
+	function testPreprocessCss() {
+		$input = array(
+			'script' => 'image_paths.css'
+		);
+
+		$result = $this->Asset->__preprocessCss($input, file_get_contents($this->Asset->paths['css'].DS.'image_paths.css'));
+
+		$this->assertPattern('#\(\/css\/images\/background\.jpg\)#', $result);
+		$this->assertPattern('#\(\/images\/bg1\.jpg\)#', $result);
+		$this->assertPattern('#\(\/css\/imgs\/bg2\.png\)#', $result);
+		$this->assertPattern('#\(\/css\/images\/arse\.gif\)#', $result);
+
+		$input = array(
+			'script' => 'some_subfolder/image_paths.css'
+		);
+
+		$result = $this->Asset->__preprocessCss($input, file_get_contents($this->Asset->paths['css'].DS.'image_paths.css'));
+
+		$this->assertPattern('#\(\/css\/some_subfolder\/images\/background\.jpg\)#', $result);
+		$this->assertPattern('#\(\/css\/images\/bg1\.jpg\)#', $result);
+		$this->assertPattern('#\(\/css\/some_subfolder\/imgs\/bg2\.png\)#', $result);
+		$this->assertPattern('#\(\/css\/images\/arse\.gif\)#', $result);
+	}
 }
