@@ -13,50 +13,58 @@
 App::import('Core', array('File', 'Folder', 'Sanitize'));
 
 class AssetHelper extends Helper {
-  //Cake debug = 0                          packed js/css returned.  $this->debug doesn't do anything.
-  //Cake debug > 0, $this->debug = false    essentially turns the helper off.  js/css not packed.  Good for debugging your js/css files.
-  //Cake debug > 0, $this->debug = true     packed js/css returned.  Good for debugging this helper.
-  var $debug = false;
+	var $options = array(
+		//Cake debug = 0  packed js/css returned.  $this->options['md5FileName']options['debug'] doesn't do anything.
+		//Cake debug > 0, $this->options['md5FileName']options['debug'] = false    essentially turns the helper off.  js/css not packed.  Good for debugging your js/css files.
+		//Cake debug > 0, $this->options['md5FileName']options['debug'] = true     packed js/css returned.  Good for debugging this helper.
+		'debug' => false,
+		
+		//there is a *minimal* perfomance hit associated with looking up the filemtimes
+		//if you clean out your cached dir (as set below) on builds then you don't need this.		
+		'checkTs' => false,
+		
+		//the packed files are named by stringing together all the individual file names
+		//this can generate really long names, so by setting this option to true
+		//the long name is md5'd, producing a resonable length file name.
+		'md5FileName' => false,
 
-  //there is a *minimal* perfomance hit associated with looking up the filemtimes
-  //if you clean out your cached dir (as set below) on builds then you don't need this.
-  var $checkTs = false;
-
+		//Additional paths for searching for css/js
+		'searchPaths' => array(),
+		
+		//Paths for storing the compressed files, relative to your webroot
+		'cachePaths' => array('css' => 'ccss', 'js' => 'cjs'),
+		
+		//options: default, low_compression, high_compression, highest_compression
+		//I like high_compression because it still leaves the file readable.		
+		'cssCompression' => 'high_compression',
+		
+		//replace relative img paths in css files with full http://...
+		'fixCssImg' => false
+	);
+	
   //Class for localizing JS files if JS I18N plugin is installed
   //http://github.com/mcurry/js/tree/master
   var $Lang = false;
 
-  //the packed files are named by stringing together all the individual file names
-  //this can generate really long names, so by setting this option to true
-  //the long name is md5'd, producing a resonable length file name.
-  var $md5FileName = false;
-
-  //you can change this if you want to store the files in a different location.
-  //this is relative to your webroot
-  var $cachePaths = array('css' => 'ccss', 'js' => 'cjs');
   var $paths = array('wwwRoot' => WWW_ROOT,
                      'js' => JS,
                      'css' => CSS);
 
   var $foundFiles = array();
 
-  //set the css compression level
-  //options: default, low_compression, high_compression, highest_compression
-  //default is no compression
-  //I like high_compression because it still leaves the file readable.
-  var $cssCompression = 'high_compression';
-
   var $helpers = array('Html', 'Javascript');
   var $viewScriptCount = 0;
   var $initialized = false;
   var $js = array();
+	
   var $css = array();
 	var $assets = array();
 
   var $View = null;
 
-  function __construct($paths=array()) {
-    $this->paths = am($this->paths, $paths);
+  function __construct($options, $paths=array()) {
+		$this->options = array_merge($this->options, $options);
+    $this->paths = array_merge($this->paths, $paths);
 
     $this->View =& ClassRegistry::getObject('view');
   }
@@ -77,7 +85,7 @@ class AssetHelper extends Helper {
       $this->__init();
     }
 		
-    if (Configure::read('debug') && $this->debug == false) {
+    if (Configure::read('debug') && $this->options['debug'] == false) {
       return join("\n\t", $this->View->__scripts);
     }
 
@@ -90,11 +98,11 @@ class AssetHelper extends Helper {
 			switch($asset['type']) {
 				case 'js':
 					$processed = $this->__process($asset['type'], $asset['assets']);
-					$scripts_for_layout[] = $this->Javascript->link('/' . $this->cachePaths['js'] . '/' . $processed);
+					$scripts_for_layout[] = $this->Javascript->link('/' . $this->options['cachePaths']['js'] . '/' . $processed);
 					break;
 				case 'css':
 					$processed = $this->__process($asset['type'], $asset['assets']);
-					$scripts_for_layout[] = $this->Html->css('/' . $this->cachePaths['css'] . '/' . $processed);
+					$scripts_for_layout[] = $this->Html->css('/' . $this->options['cachePaths']['css'] . '/' . $processed);
 					break;				
 				default:
 					$scripts_for_layout[] = $asset['assets']['script'];
@@ -118,21 +126,13 @@ class AssetHelper extends Helper {
                                array_slice($this->View->__scripts, $this->viewScriptCount),
                                array_slice($this->View->__scripts, 0, $this->viewScriptCount)
                              );
-		if (Configure::read('debug') && $this->debug == false) {
+		if (Configure::read('debug') && $this->options['debug'] == false) {
 			return;
 		}
 		
     if (App::import('Model', 'Js.JsLang')) {
       $this->Lang = ClassRegistry::init('Js.JsLang');
       $this->Lang->init();
-    }
-
-    if (Configure::read('Asset.jsPath')) {
-      $this->cachePaths['js'] = Configure::read('Asset.jsPath');
-    }
-
-    if (Configure::read('Asset.cssPath')) {
-      $this->cachePaths['css'] = Configure::read('Asset.cssPath');
     }
 
     //split the scripts into js and css
@@ -225,7 +225,7 @@ class AssetHelper extends Helper {
 
   function __process($type, $assets) {
     $path = $this->__getPath($type);
-    $folder = new Folder($this->paths['wwwRoot'] . $this->cachePaths[$type], true);
+    $folder = new Folder($this->paths['wwwRoot'] . $this->options['cachePaths'][$type], true);
 
     //check if the cached file exists
     $scripts = Set::extract('/script', $assets);
@@ -237,8 +237,8 @@ class AssetHelper extends Helper {
 
     //make sure all the pieces that went into the packed script
     //are OLDER then the packed version
-    if ($this->checkTs && $fileName) {
-      $packed_ts = filemtime($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
+    if ($this->options['checkTs'] && $fileName) {
+      $packed_ts = filemtime($this->paths['wwwRoot'] . $this->options['cachePaths'][$type] . DS . $fileName);
 
       $latest_ts = 0;
       foreach($assets as $asset) {
@@ -251,7 +251,7 @@ class AssetHelper extends Helper {
 
       //an original file is newer.  need to rebuild
       if ($latest_ts > $packed_ts) {
-        unlink($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
+        unlink($this->paths['wwwRoot'] . $this->options['cachePaths'][$type] . DS . $fileName);
         $fileName = null;
       }
     }
@@ -268,7 +268,7 @@ class AssetHelper extends Helper {
         case 'css':
           App::import('Vendor', 'csstidy', array('file' => 'class.csstidy.php'));
           $tidy = new csstidy();
-          $tidy->load_template($this->cssCompression);
+          $tidy->load_template($this->options['cssCompression']);
           break;
       }
 
@@ -287,7 +287,11 @@ class AssetHelper extends Helper {
             break;
 
           case 'css':
-            $tidy->parse($this->__preprocessCss($asset, $buffer));
+						if($this->options['fixCssImg']) {
+							$buffer = $this->__preprocessCss($asset, $buffer);
+						}
+						
+            $tidy->parse($buffer);
             $buffer = $tidy->print->plain();
             break;
         }
@@ -302,7 +306,7 @@ class AssetHelper extends Helper {
 
       //write the file
       $fileName = $this->__generateFileName($scripts) . '_' . $ts . '.' . $type;
-      $file = new File($this->paths['wwwRoot'] . $this->cachePaths[$type] . DS . $fileName);
+      $file = new File($this->paths['wwwRoot'] . $this->options['cachePaths'][$type] . DS . $fileName);
       $file->write(trim($scriptBuffer));
     }
 
@@ -343,9 +347,8 @@ class AssetHelper extends Helper {
     }
 
     $paths = array($this->__getPath($type));
-    if (Configure::read('Asset.searchPaths')) {
-      $paths = array_merge($paths, Configure::read('Asset.searchPaths'));
-    }
+		$paths = array_merge($paths, $this->options['searchPaths']);
+		
     
     if (!empty($asset['plugin']) > 0) {
       $pluginPaths = App::path('plugins');
@@ -390,7 +393,7 @@ class AssetHelper extends Helper {
   function __generateFileName($names) {
     $fileName = Sanitize::paranoid(str_replace('/', '-', implode('_', $names)), array('_', '-'));
 
-    if ($this->md5FileName) {
+    if ($this->options['md5FileName']) {
       $fileName = md5($fileName);
     }
 

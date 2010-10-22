@@ -22,7 +22,7 @@ class AssetTestCase extends CakeTestCase {
     $controller = null;
     $this->View = new View($controller);
     
-    $this->Asset = new AssetHelper(array('wwwRoot' => $this->wwwRoot, 'js' => $this->wwwRoot . 'js' . DS, 'css' => $this->wwwRoot . 'css' . DS));
+    $this->Asset = new AssetHelper(array(), array('wwwRoot' => $this->wwwRoot, 'js' => $this->wwwRoot . 'js' . DS, 'css' => $this->wwwRoot . 'css' . DS));
     $this->Asset->Javascript = new JavascriptHelper();
     $this->Asset->Html = new HtmlHelper();
     
@@ -82,11 +82,11 @@ class AssetTestCase extends CakeTestCase {
   }
   
   function testGenerateFileNameMd5() {
-    $this->Asset->md5FileName = true;
+    $this->Asset->options['md5FileName'] = true;
     $files = array('script1', 'script2', 'script3');
     $name = $this->Asset->__generateFileName($files);
     $this->assertEqual('4991a54c1356544e1188bf6c8b9e7ae9', $name);
-    $this->Asset->md5FileName = false;
+    $this->Asset->options['md5FileName'] = false;
   }
   
   function testFindFileDupeName() {
@@ -119,7 +119,7 @@ END;
   }
   
   function testGetFileContentsExtraPath() {
-    Configure::write('Asset.searchPaths', array($this->wwwRoot . 'js' . DS));
+    $this->Asset->options['searchPaths'] = array($this->wwwRoot . 'js' . DS);
     $asset = array('plugin' => '', 'script' => 'open_source_with_js_and_css/style');
     $contents = $this->Asset->__getFileContents($asset, 'css');
     $expected = <<<END
@@ -128,7 +128,7 @@ END;
 }
 END;
     $this->assertEqual($expected, $contents);
-    Configure::delete('Asset.searchPaths');
+    $this->Asset->options['searchPaths'] = array();
   }
   
   function testProcessJsNew() {
@@ -185,9 +185,10 @@ END;
                 array('plugin' => '', 'script' => 'script2'),
                 array('plugin' => 'asset', 'script' => 'script3'));
     
-    $this->Asset->checkTs = true;
+    $this->Asset->options['checkTs'] = true;
     $fileName = $this->Asset->__process('js', $js);
     $this->assertNotEqual($origFileName, $fileName);
+    $this->Asset->options['checkTs'] = false;
   }
   
   function testProcessCssNew() {
