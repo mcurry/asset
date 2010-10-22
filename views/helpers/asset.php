@@ -296,18 +296,13 @@ class AssetHelper extends Helper {
     }
     
     if (!empty($asset['plugin']) > 0) {
-      $pluginPaths = Configure::read('pluginPaths');
+      $pluginPaths = App::path('plugins');
       $count = count($pluginPaths);
       for ($i = 0; $i < $count; $i++) {
-        $paths[] = $pluginPaths[$i] . $asset['plugin'] . DS . 'vendors' . DS;
+        $paths[] = $pluginPaths[$i] . $asset['plugin'] . DS . 'webroot' . DS;
       }
     }
 
-		$vendorPaths = Configure::read('vendorPaths');
-		if($vendorPaths) {
-			$paths = array_merge($paths, $vendorPaths);
-		}
-		
     $assetFile = '';
     foreach ($paths as $path) {
       $script = sprintf('%s.%s', $asset['script'], $type);

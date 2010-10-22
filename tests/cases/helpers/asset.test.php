@@ -199,13 +199,13 @@ END;
     
     $fileName = $this->Asset->__process('css', $css);
     $expected = <<<END
-/* style1.css (70%) */
+/* style1.css (78%) */
 *{margin:0;padding:0;}
 
-/* style2.css (85%) */
+/* style2.css (89%) */
 body{background:#003d4c;color:#fff;font-family:'lucida grande',verdana,helvetica,arial,sans-serif;font-size:90%;margin:0;}
 
-/* style3.css (69%) */
+/* style3.css (72%) */
 h1,h2,h3,h4{font-weight:400;}
 END;
     $contents = file_get_contents($this->cssCache . $fileName  . '.css');
