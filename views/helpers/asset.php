@@ -85,9 +85,27 @@ class AssetHelper extends Helper {
       $this->__init();
     }
 		
-    if (Configure::read('debug') && $this->options['debug'] == false) {
-      return join("\n\t", $this->View->__scripts);
-    }
+    //Allow breaking up of js,css,codeblock in your html when debug is > 0
+    //Ex: putting 'css' in head and 'js','codeblock' at bottom before </body>
+		if (Configure::read('debug') && $this->options['debug'] == false) {
+			$scripts_for_layout = array();
+			
+			foreach ($this->View->__scripts as $resource) {
+				foreach ($types as $type) {
+					if($type == 'css' || $type == 'js') {
+						if(stristr($resource, '.'.$type)) {
+							$scripts_for_layout[] = $resource;
+						}
+					} else if($type == 'codeblock') {
+						if(!stristr($resource, '.js') && !stristr($resource,' .css')) {
+							$scripts_for_layout[] = $resource;
+						}
+					}
+				}
+			}
+			
+			return join("\n\t", $scripts_for_layout);
+		}
 
     $scripts_for_layout = array();
 		foreach($this->assets as $asset) {
