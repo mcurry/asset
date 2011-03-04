@@ -62,11 +62,11 @@ class AssetTestCase extends CakeTestCase {
   function testVendors() {
     if(PHP5) {
       App::import('Vendor', 'jsmin/jsmin');
-      $this->assertTrue(class_exists('JSMin'));
+      $this->assertTrue(class_exists('JSMin'), 'JSMin not installed in vendors');
     }
     
     App::import('Vendor', 'csstidy', array('file' => 'class.csstidy.php'));
-    $this->assertTrue(class_exists('csstidy'));
+    $this->assertTrue(class_exists('csstidy'), 'csstidy not installed in vendors');
   }
   
   function testAfterRender() {
